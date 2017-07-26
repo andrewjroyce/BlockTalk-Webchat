@@ -1,62 +1,61 @@
-const SocketServer = require('ws');
-const uuid = require('uuid/v4');
+const SocketServer = require('ws').Server;
 const PORT = 3001;
-let onlineUsers = 0;
-const wss = new SocketServer.Server({ port: PORT });
+const wss = new SocketServer({ port: PORT });
+const uuidv4 = require('uuid/v4');
+let connectedUsers = 4;
 
-wss.broadcast = function broadcast(data) {
-  wss.clients.forEach(function each(client) {
-    if (client.readyState === SocketServer.OPEN) {
-      console.log(client.readyState)
-      client.send(data);
-    }
-  });
-};
+
 wss.on('connection', (ws) => {
-  onlineUsers += 1;
-  const welcomeMessage = {
-    type: "userChange",
-    // id: uuid(),
-    username: "",
-    userCount: onlineUsers,
-    content: "New user signed on"
-  };
-  wss.broadcast(JSON.stringify(welcomeMessage));
+  connectedUsers += 1;
+  wss.clients.forEach((client) => {
+    client.send(JSON.stringify({
+      type: 'userCount',
+      userCount: connectedUsers
+    }));
+  })
 
-  ws.on('message', function incoming(data) {
-    var incoming = JSON.parse(data);
-    switch (incoming.type) {
-      case "postMessage":
-        const processedMessage = {
-          type: "incomingMessage",
-          id: uuid(),
+  ws.on('message', (data) => {
+    const incoming = JSON.parse(data);
+    const uuid = uuidv4();
+    let messageOut = {};
+
+    switch (incoming.type){
+      case 'postMessage':
+        messageOut = {
+          type: 'incomingMessage',
+          id: uuid,
           username: incoming.username,
           content: incoming.content
-        };
-        wss.broadcast(JSON.stringify(processedMessage));
+        }
+        wss.clients.forEach((client) => {
+            client.send(JSON.stringify(messageOut));
+        })
         break;
       case "postNotification":
-        const notifcationMessage = {
-          type: "incomingNotification",
-          username: incoming.username,
-          // id: uuid(), 
-          content: incoming.content
-        };
-        wss.broadcast(JSON.stringify(notifcationMessage));
+        messageOut = {
+          type: 'incomingNotification',
+          id: uuid,
+          oldName: incoming.oldName,
+          newName: incoming.newName
+        }
+        wss.clients.forEach((client) => {
+            client.send(JSON.stringify(messageOut));
+        })
         break;
-      default:
-        throw new Error("Unknown event type " + data.type);
+      default :
+        ws.send("Error")
     }
-
   });
-
+  // Set up a callback for when a client closes the socket. This usually means they closed their browser.
   ws.on('close', () => {
-    onlineUsers -= 1;
+    connectedUsers -= 1;
     wss.clients.forEach((client) => {
       client.send(JSON.stringify({
-        type: 'userChange',
-        userCount: onlineUsers
+      type: 'userCount',
+      userCount: connectedUsers
       }));
     })
   });
 });
+
+console.log('socket server running on PORT :', PORT);

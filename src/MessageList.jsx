@@ -1,15 +1,27 @@
 import React, {Component} from 'react';
 import Message from './Message.jsx';
+import Notification from './Notification.jsx';
 
 class MessageList extends Component {
   render() {
-    var conversation;
-    conversation = this.props.messages.map(message => <Message key={message.id} username={message.username} content={message.content} type={message.type} id={message.id} userCount={message.userCount} />);
+    let communication;
+    communication = this.props.messages.map((message) =>{
+      switch(message.type) {
+        case 'incomingMessage':
+          return <Message key={message.id}{...message}/>
+          break;
+        case 'incomingNotification':
+          return <Notification key={message.id}{...message}/>
+          break;
+        default:
+          throw new Error('Error');
+      }
+    });
     return(
       <main className="messages" >
-        {conversation}
+        {communication}
       </main>
     )
-  }   
+  }
 }
 export default MessageList;
